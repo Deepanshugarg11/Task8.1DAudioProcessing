@@ -2,54 +2,64 @@ import speech_recognition as sr
 import RPi.GPIO as GPIO
 import time
 
-# Setup GPIO pins
+# Setup GPIO for the led
+
 GPIO.setmode(GPIO.BCM)
-light_pin = 18  # Use any available GPIO pin
-GPIO.setup(light_pin, GPIO.OUT)
+LED_PIN = 17  # Replace with your GPIO pi
+GPIO.setup(LED_PIN, GPIO.OUT)
 
-# Function to turn light ON or OFF
-def control_light(command):
-    if 'turn on' in command:
-        GPIO.output(light_pin, GPIO.HIGH)
-        print("Light is turned ON.")
-    elif 'turn off' in command:
-        GPIO.output(light_pin, GPIO.LOW)
-        print("Light is turned OFF.")
-    else:
-        print("Command not recognized.")
+def led_on():
+    GPIO.output(LED_PIN, GPIO.HIGH)
+    print("Led ON")
+    time.sleep(0.5)  # Debounce time
 
-# Function to recognize voice commands
-def recognize_speech():
+def led_off():
+    GPIO.output(LED_PIN, GPIO.LOW)
+    print("Led OFF")
+    time.sleep(0.5)  # Debounce time
+
+def listen_for_command():
+    # Initialize the recognizer
     recognizer = sr.Recognizer()
-    mic = sr.Microphone()
-
-    with mic as source:
-        print("Say something...")
-        recognizer.adjust_for_ambient_noise(source)  # Adjust for ambient noise
-        audio = recognizer.listen(source)
+    microphone = sr.Microphone()
 
     try:
-        command = recognizer.recognize_google(audio)
-        print("You said: " + command)
-        return command.lower()  # Convert command to lowercase
+        with microphone as source:
+            print("Adjusting for background noise... Please wait.")
+            recognizer.adjust_for_ambient_noise(source)
+            print("Listening for command...")
+            audio = recognizer.listen(source)
+
+            # Recognize speech using Google Speech Recognition
+            command = recognizer.recognize_google(audio).lower()
+            print(f"Command received: {command}")
+
+            return command
     except sr.UnknownValueError:
         print("Sorry, I could not understand the audio.")
-    except sr.RequestError as e:
-        print("Request error from Google Speech Recognition service; {0}".format(e))
+    except sr.RequestError:
+        print("Could not request results from the speech recognition service.")
+    return ""
 
-    return None
+def process_command(command):
+    print(f"Processing command: {command}")
+    if "led on" in command:
+        print("Recognized command: Led ON")
+        led_on()
+    elif "led off" in command:
+        print("Recognized command: Led OFF")
+        led_off()
+    else:
+        print("Command not recognized. Please say 'led on' or 'led off'.")
 
-# Main loop
-try:
-    while True:
-        command = recognize_speech()
-        if command:
-            control_light(command)
-        time.sleep(1)
-
-except KeyboardInterrupt:
-    print("Program terminated.")
-finally:
-    GPIO.cleanup()  # Cleanup GPIO on exit
-
-
+if __name__ == "__main__":
+    try:
+        while True:
+            command = listen_for_command()
+            if command:
+                process_command(command)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting program.")
+    finally:
+        GPIO.cleanup()
